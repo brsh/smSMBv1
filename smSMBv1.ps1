@@ -20,14 +20,53 @@
 Toggles SMBv1 support based on the smDeployOrderClassifier WMI instance
 
 .DESCRIPTION
-Lots of text goes here to explain all the things.
+A script used to enable/disable (incl. install/uninstall if approps) the SMBv1 protocol
+on Windows systems. 
+
+Note: This only affects the _serving_ of SMBv1 - it does not affect a client being able
+to _read_ (or _access_) SMBv1 resources.
+
+This script is intended to be used with a specific WMI Class (which is not public, sorry).
+However, it can be used "manually" via command line switches or modified to support a 
+different WMI class.
+
+Syntax
+```
+PS> .\smSMBv1.ps1 [[-Mode] <String>] [-AllowReboot ] 
+```
+
+-Mode:
+
+| Value | Definition |
+| ------ | ---------- |
+| Enable | Enable/Install SMBv1 Server |
+| Disable | Disable/Uninstall SMBv1 Server |
+| Test | Test the state of SMBv1 Server |
+| Auto | Process SMBv1 Server status as defined by `SMBv1Enable` WMI value |
+
+-AllowReboot:
+
+Enabling/disabling generally requires a reboot. This switch will reboot the server (if needed)
 
 .PARAMETER Name
 Parameter Description
 
 .EXAMPLE
-smSMBv1.ps1
+smSMBv1.ps1 -Mode 'Test'
 
+Checks the status of SMBv1 Server
+
+  Testing SMBv1 Status
+    SMBv1ShouldBeEnabled = False; SMBv1IsEnabled = False; OSFeature = Disabled
+
+.EXAMPLE
+smSMBv1.ps1 Auto
+
+Checks the status of SMBv1 Server and enables/disables as set in the WMI Class
+
+  Testing SMBv1 Status
+    SMBv1ShouldBeEnabled = False; SMBv1IsEnabled = False; OSFeature = Disabled
+    SMBv1 should _not_ be and is not enabled. Nothing to do here
 #>
 
 [CmdLetBinding()]
@@ -144,7 +183,7 @@ function Write-Status {
             if ($Type[$index] -match 'High$') { $BGColor = $ColorHighlight }
             Write-Host $txt -ForegroundColor $FGColor -BackgroundColor $BGColor -NoNewline
         }
-        write-host ''
+        Write-Host ''
     }
 
     if ($e) {
@@ -348,7 +387,7 @@ function Disable-smSMBv1 {
                 $a = Disable-WindowsOptionalFeature -Online -FeatureName smb1protocol -NoRestart
                 if (($a.RestartNeeded) -and ($AllowReboot)) {
                     Write-Status -Message 'AllowReboot is True - so rebooting' -Type Info -Level 500
-                                       Restart-Computer -Force
+                    Restart-Computer -Force
                 }
             } catch {
                 Write-Status -Message "Failed to disable windows optional feature smb1protocol! OS is '$script:OSCaption' ($OS)" -Type Error -e $_ -EventID 303 -Level 2
@@ -463,8 +502,8 @@ function Set-Auto {
             Write-Status -Message 'Changes are pending - and AllowReboot is True... so rebooting' -Type Info -Level 501
             Restart-Computer -Force
         } else {
-        Write-Status "Changes to the OS are pending ('$($Status.OSFeature)') - bypassing any further processing until a reboot" -Type Warning -Level 0 -EventID 9
-    }
+            Write-Status "Changes to the OS are pending ('$($Status.OSFeature)') - bypassing any further processing until a reboot" -Type Warning -Level 0 -EventID 9
+        }
     } else {
         if ($Status.SMBv1ShouldBeEnabled -match 'True') {
             if ($Status.SMBv1IsEnabled -match 'True') {
